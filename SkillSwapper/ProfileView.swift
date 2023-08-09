@@ -7,18 +7,18 @@
 
 import SwiftUI
 import FirebaseAuth
-import FirebaseStorage
+import FirebaseFirestore
 
 struct ProfileView: View {
-    @State private var username: String = "Huy Ong"
-    @State private var userbio: String = "CS @SJSU"
-    @State private var location: String = "San Jose, CA"
-    @State private var website: String = "huyong.code.dev"
+    @State private var username: String = ""
+    @State private var userbio: String = ""
+    @State private var location: String = ""
+    @State private var website: String = ""
     @State private var dob: Date = .init()
     
     @Binding var user: User?
     
-    private let fixWidth: CGFloat = 120
+    private let fixWidth: CGFloat = 100
     
     var body: some View {
         NavigationStack {
@@ -34,7 +34,7 @@ struct ProfileView: View {
                     
                     Divider()
                     
-                    HStack {
+                    HStack(alignment: .top) {
                         Text("Bio")
                             .bold()
                             .frame(width: fixWidth, alignment: .leading)
@@ -89,6 +89,7 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .padding()
             .background(Color.systemColor(.systemGray6))
+            .onAppear(perform: fetchUserProfile)
             .toolbar {
                 ToolbarItem {
                     Button("Save") {
@@ -98,17 +99,34 @@ struct ProfileView: View {
                             "location": location,
                             "website": website
                         ]
+                        let uid = user!.uid
                         
-                        do {
-                            let encodedData = try JSONEncoder().encode(data)
-                            let uid = user!.uid
-                            Storage.storage().reference(withPath: "users").child(uid).putData(encodedData)
-                            
-                        } catch {
-                            print("Error \(error)")
+                        Firestore.firestore()
+                            .collection("users")
+                            .document(uid)
+                            .setData(data) { error in
+                            if let error {
+                                print(error)
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+    
+    private func fetchUserProfile() {
+        if let userID = user?.uid {
+            Firestore.firestore().collection("users").document(userID).getDocument { snapshot, error in
+                if let error {
+                    print(error.localizedDescription)
+                }
+                
+                guard let snapshot = snapshot, let data = snapshot.data() else { return }
+                self.username = data["name"] as? String ?? ""
+                self.userbio = data["bio"] as? String ?? ""
+                self.location = data["location"] as? String ?? ""
+                self.website = data["website"] as? String ?? ""
             }
         }
     }
